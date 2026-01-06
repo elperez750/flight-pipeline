@@ -7,14 +7,12 @@
 #include <stdlib.h> // Include for EXIT_FAILURE
 
 
-// This is the struct to extract the post parameters passed in
-typedef struct
-{
-    char name[30];
-    int age;
-} Person;
 
-// This is the struct that holds the path and query
+// This is the struct that will hold the path and the query
+
+// The path for example would be "curl "https://opensky-network.org/api/states/all"
+// The query would be "?name=elliott&age=22"
+
 typedef struct
 {
     char path[256];  // Everything before the question mark
@@ -22,11 +20,14 @@ typedef struct
 } ParsedRoute;
 
 // This is the individual query param for a route
+// From the last example, the key would be name and age
+// The value would be elliott and 22
 typedef struct
 {
     char key[256];
     char value[256];
 } QueryParam;
+
 
 // This holds multiple query params
 typedef struct
@@ -69,7 +70,11 @@ void split_query_params(QueryParams *qp, char *query)
 
     char query_copy[256];
 
+    // query would be "rounds=5&difficulty=hard"
+    // We copy this into our query copy string
     strncpy(query_copy, query, sizeof(query_copy) - 1);
+
+    // We then end it using '\0'
     query_copy[sizeof(query_copy) - 1] = '\0';
 
     // saveptr1 is for each param
@@ -79,14 +84,19 @@ void split_query_params(QueryParams *qp, char *query)
 
     char *saveptr1, *saveptr2;
 
+    // This will split on the &, basically giving us a query each time
     char *pair = strtok_r(query_copy, "&", &saveptr1);
 
     while (pair != NULL)
     {
 
+        // The key will be rounds
         char *key = strtok_r(pair, "=", &saveptr2);
+
+        // The value will be 5
         char *value = strtok_r(NULL, "=", &saveptr2);
 
+        // If we get values for bot we will simply save them into our structure
         if (key && value)
         {
             size_t key_size = sizeof(qp->params[qp->count].key);
@@ -109,6 +119,7 @@ void split_query_params(QueryParams *qp, char *query)
     // rounds = 5
     // difficulty = hard
 }
+
 
 ParsedRoute *split_route(char *route)
 {
@@ -220,55 +231,6 @@ char *get_header_value(char *request, char *header_name)
     return NULL;
 }
 
-char *get_request_body(char *response)
-{
-    char *end_of_headers = strstr(response, "\r\n\r\n");
-
-    if (end_of_headers == NULL)
-    {
-        return NULL;
-    }
-
-    end_of_headers += 4; // Move past the "\r\n\r\n"
-
-    char *start_of_body = strstr(end_of_headers, "n");
-
-    char *name_start = strstr(start_of_body, "=");
-
-    name_start += 1;
-    char *name_end = strstr(name_start, "&");
-
-    size_t name_size = name_end - name_start;
-
-    Person *person1 = malloc(sizeof(Person));
-    char *name = malloc(name_size + 1);
-
-    strncpy(name, name_start, name_size);
-    name[name_size] = '\0';
-    strncpy(person1->name, name, name_size);
-    free(name);
-
-    char *age_start = strstr(start_of_body, "&age=");
-    if (age_start)
-    {
-        age_start += 5; // Skip "&age=", now at "21"
-    }
-    size_t age_size = strlen(age_start);
-    printf("This is the age size %zu\n", age_size);
-
-    char *age = malloc(age_size + 1);
-    strncpy(age, age_start, age_size);
-    person1->age = atoi(age);
-    free(age);
-
-    printf("This is the age %d\n", person1->age);
-
-    printf("These are the headers %s\n", person1->name);
-
-    free(person1);
-
-    return start_of_body;
-}
 
 char *find_query_start(char *route)
 {
