@@ -6,14 +6,9 @@
 #include <string.h>
 #include <stdlib.h> // Include for EXIT_FAILURE
 
-// This is the struct to extract the post parameters passed in
-typedef struct
-{
-    char name[30];
-    int age;
-} Person;
 
-// This is the struct that holds the path and query
+
+// This is the struct that will hold the path and the query
 typedef struct
 {
     char path[256];  // Everything before the question mark
@@ -21,6 +16,11 @@ typedef struct
 } ParsedRoute;
 
 // This is the individual query param for a route
+
+/*
+
+
+*/
 typedef struct
 {
     char key[256];
@@ -219,55 +219,6 @@ char *get_header_value(char *request, char *header_name)
     return NULL;
 }
 
-char *get_request_body(char *response)
-{
-    char *end_of_headers = strstr(response, "\r\n\r\n");
-
-    if (end_of_headers == NULL)
-    {
-        return NULL;
-    }
-
-    end_of_headers += 4; // Move past the "\r\n\r\n"
-
-    char *start_of_body = strstr(end_of_headers, "n");
-
-    char *name_start = strstr(start_of_body, "=");
-
-    name_start += 1;
-    char *name_end = strstr(name_start, "&");
-
-    size_t name_size = name_end - name_start;
-
-    Person *person1 = malloc(sizeof(Person));
-    char *name = malloc(name_size + 1);
-
-    strncpy(name, name_start, name_size);
-    name[name_size] = '\0';
-    strncpy(person1->name, name, name_size);
-    free(name);
-
-    char *age_start = strstr(start_of_body, "&age=");
-    if (age_start)
-    {
-        age_start += 5; // Skip "&age=", now at "21"
-    }
-    size_t age_size = strlen(age_start);
-    printf("This is the age size %zu\n", age_size);
-
-    char *age = malloc(age_size + 1);
-    strncpy(age, age_start, age_size);
-    person1->age = atoi(age);
-    free(age);
-
-    printf("This is the age %d\n", person1->age);
-
-    printf("These are the headers %s\n", person1->name);
-
-    free(person1);
-
-    return start_of_body;
-}
 
 char *find_query_start(char *route)
 {
