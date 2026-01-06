@@ -6,6 +6,7 @@
 #include <string.h>
 #include <stdlib.h> // Include for EXIT_FAILURE
 
+
 // This is the struct to extract the post parameters passed in
 typedef struct
 {
