@@ -71,7 +71,7 @@ char* fetch_opensky() {
     
     // Seattle bounding box. This is the url
     curl_easy_setopt(curl, CURLOPT_URL, 
-        "https://opensky-network.org/api/states/all?lamin=47.0&lomin=-123.0&lamax=48.0&lomax=-121.5");
+        "https://opensky-network.org/api/states/all");
 
     // Function that will perform the writing logic
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
@@ -215,6 +215,9 @@ int main() {
         printf("Last Contact: %d\n", fleet[i].last_contact);
         printf("\n");
     }
+
+    printf("Number of flights: %d\n", num_flights);
+
 
     free(seattle_data);
     free(fleet);
