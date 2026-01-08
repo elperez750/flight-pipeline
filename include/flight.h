@@ -17,7 +17,7 @@ last_contact (so you know when data was fresh)
 typedef struct {
     int time; // will be passed into function
     char icao24[16]; // index 0
-    char callsign[8]; // index 1
+    char callsign[9]; // index 1
     char origin_country[20]; // index 2
     float latitude; // index 6
     float longitude; // index 5

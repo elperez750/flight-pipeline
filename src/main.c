@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <curl/curl.h>
-#include "include/flight.h"
+#include "flight.h"
 
 
 
@@ -116,28 +116,57 @@ typedef struct {
 
 */
 
+double safe_get_number(cJSON *array, int index) {
+    // We get the number by passing in the array and the index
 
-void parse_flight(cJSON *state_array, Flight *f, int timestamp) {
+    // We seacrh the array at the given index
+    cJSON *item = cJSON_GetArrayItem(array, index);
+
+    // Check to see if we got something and if that something is a number
+    if (item && cJSON_IsNumber(item)) {
+
+        // We return the value of the item, which is a double
+        // This is automatically converted to a float and int 
+
+        return item->valuedouble;
+    }
+
+    return 0.0;
+}
+
+void safe_get_string(cJSON *array, int index, char *dest, size_t max_len) {
+    cJSON *item = cJSON_GetArrayItem(array, index);
+
+    if (item && cJSON_IsString(item)) {
+        strncpy(dest, item->valuestring, max_len - 1);
+        dest[max_len - 1] = '\0';
+    }
+    else {
+        strcpy(dest, "N/A");
+    }
+}
+
+
+void parser_helper(cJSON *state_array, Flight *f, int timestamp) {
+
+    // Pass in the time to the struct
     f->time = timestamp;
 
-    cJSON *icao24 = cJSON_GetArrayItem(state_array, 0);
-    cJSON *callsign = cJSON_GetArrayItem(state_array, 1);
-    cJSON *origin_country = cJSON_GetArrayItem(state_array, 2);
-    cJSON *longitude = cJSON_GetArrayItem(state_array, 5);
-    cJSON *latitude = cJSON_GetArrayItem(state_array, 6);
-    cJSON *velocity = cJSON_GetArrayItem(state_array, 9);
-    cJSON *last_contact = cJSON_GetArrayItem(state_array, 4);
-    cJSON *geo_altitude = cJSON_GetArrayItem(state_array, 13);
+    // We need to check if values are null before hand
+
+    // Storing the strings inside of the struct
+    safe_get_string(state_array, 0, f->icao24, sizeof(f->icao24));
+    safe_get_string(state_array, 1, f->callsign, sizeof(f->callsign));
+    safe_get_string(state_array, 2, f->origin_country, sizeof(f->origin_country));
+
+    // Storing numbers inside of the struct
+    f->last_contact = (int)safe_get_number(state_array, 4);
+    f->longitude = (float)safe_get_number(state_array, 5);
+    f->latitude = (float)safe_get_number(state_array, 6);
+    f->velocity = (float)safe_get_number(state_array, 9);
+    f->geo_altitude = (float)safe_get_number(state_array, 13);
 
 
-    strncpy(f->icao24, icao24->valuestring, sizeof(f->icao24) - 1);
-    strncpy(f->callsign, callsign->valuestring, sizeof(f->callsign) - 1);
-    strncpy(f->origin_country, origin_country->valuestring, sizeof(f->origin_country) - 1);
-    f->longitude = longitude->valuedouble;
-    f->latitude = latitude->valuedouble;
-    f->velocity = velocity->valuedouble;
-    f->last_contact = last_contact->valueint;
-    f->geo_altitude = geo_altitude->valuedouble;
 
 }
 
@@ -151,26 +180,30 @@ void parse_first_flight(char *json_response) {
     cJSON *states = cJSON_GetObjectItem(root, "states");
 
 
-    cJSON *first_item = cJSON_GetArrayItem(states, 0);
+    cJSON *first_item = cJSON_GetArrayItem(states, 3);
 
    
-    char *test = cJSON_Print(cJSON_GetArrayItem(first_item, 0));
-
-    parse_flight(first_item, &flight, time->valueint);
-
-    
-    for (int i = 0; i < cJSON_GetArraySize(first_item); i++) {
-        cJSON *item = cJSON_GetArrayItem(first_item, i);
-        
-    }
-    
 
 
-    printf("%s\n", test);
-    printf("%d\n", time->valueint);
-
+    // First item includes all fields
+    // flight will be the struct where we include the data
+    // we are passing in time to pass into the struct.
+    parser_helper(first_item, &flight, time->valueint);
 
     
+    printf("First flight data:\n");
+    printf("Time: %d\n", flight.time);
+    printf("ICAO24: %s\n", flight.icao24);
+    printf("Callsign: %s\n", flight.callsign);
+    printf("Origin Country: %s\n", flight.origin_country);
+    printf("Latitude: %f\n", flight.latitude);
+    printf("Longitude: %f\n", flight.longitude);
+    printf("Geo Altitude: %f\n", flight.geo_altitude);
+    printf("Velocity: %f\n", flight.velocity);
+    printf("Last Contact: %d\n", flight.last_contact);  
+
+
+    cJSON_Delete(root);
 
 
 
