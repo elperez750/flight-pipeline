@@ -172,52 +172,52 @@ void parser_helper(cJSON *state_array, Flight *f, int timestamp) {
 
 
 
-void parse_first_flight(char *json_response) {
-    Flight flight;
-
-    cJSON *root = cJSON_Parse(json_response);
-    cJSON *time = cJSON_GetObjectItem(root, "time");
-    cJSON *states = cJSON_GetObjectItem(root, "states");
-
-
-    cJSON *first_item = cJSON_GetArrayItem(states, 3);
-
-   
-
-
-    // First item includes all fields
-    // flight will be the struct where we include the data
-    // we are passing in time to pass into the struct.
-    parser_helper(first_item, &flight, time->valueint);
-
-    
-    printf("First flight data:\n");
-    printf("Time: %d\n", flight.time);
-    printf("ICAO24: %s\n", flight.icao24);
-    printf("Callsign: %s\n", flight.callsign);
-    printf("Origin Country: %s\n", flight.origin_country);
-    printf("Latitude: %f\n", flight.latitude);
-    printf("Longitude: %f\n", flight.longitude);
-    printf("Geo Altitude: %f\n", flight.geo_altitude);
-    printf("Velocity: %f\n", flight.velocity);
-    printf("Last Contact: %d\n", flight.last_contact);  
-
-
-    cJSON_Delete(root);
-
-
-
-}
-
-
 
 int main() {
     printf("Testing cJSON...\n");
     
     char *seattle_data = fetch_opensky();
 
-    parse_first_flight(seattle_data);
+    // This gets JSON root
+    cJSON *root = cJSON_Parse(seattle_data);
+
+    // This will get us the time
+    cJSON *time = cJSON_GetObjectItem(root, "time");
+
+    // This gets us the states array, which holds all flight data
+    cJSON *states = cJSON_GetObjectItem(root, "states");
+
+    // Get number of flights in the Seattle area
+    int num_flights = cJSON_GetArraySize(states);
+    printf("Number of flights in Seattle area: %d\n", num_flights);
+
+
+    Flight *fleet = malloc(num_flights * sizeof(Flight));
+
+    // We pass in the flight to process, We pass in the allocated memory
+
+    for (int i = 0; i < num_flights; i++) {
+        parser_helper(cJSON_GetArrayItem(states, i), &fleet[i], time->valueint);
+    }
     
-    
+
+    for (int i = 0; i < num_flights; i++) {
+        
+        printf("Flight number %d\n", i);
+        printf("Time: %d\n", fleet[i].time);
+        printf("ICAO24: %s\n", fleet[i].icao24);
+        printf("Callsign: %s\n", fleet[i].callsign);
+        printf("Origin Country: %s\n", fleet[i].origin_country);
+        printf("Latitude: %f\n", fleet[i].latitude);
+        printf("Longitude: %f\n", fleet[i].longitude);
+        printf("Geo Altitude: %f\n", fleet[i].geo_altitude);
+        printf("Velocity: %f\n", fleet[i].velocity);
+        printf("Last Contact: %d\n", fleet[i].last_contact);
+        printf("\n");
+    }
+
+    free(seattle_data);
+    free(fleet);
+    cJSON_Delete(root);
     return 0;
 }
