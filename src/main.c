@@ -3,6 +3,7 @@
 #include <string.h>
 #include <curl/curl.h>
 #include "flight.h"
+#include "database.h"
 
 
 
@@ -175,6 +176,8 @@ void parser_helper(cJSON *state_array, Flight *f, int timestamp) {
 
 int main() {
     printf("Testing cJSON...\n");
+    sqlite3 *db;
+    init_database(&db);
     
     char *seattle_data = fetch_opensky();
 
@@ -198,29 +201,16 @@ int main() {
 
     for (int i = 0; i < num_flights; i++) {
         parser_helper(cJSON_GetArrayItem(states, i), &fleet[i], time->valueint);
+        insert_flight(db, &fleet[i]);
     }
     
 
-    for (int i = 0; i < num_flights; i++) {
-        
-        printf("Flight number %d\n", i);
-        printf("Time: %d\n", fleet[i].time);
-        printf("ICAO24: %s\n", fleet[i].icao24);
-        printf("Callsign: %s\n", fleet[i].callsign);
-        printf("Origin Country: %s\n", fleet[i].origin_country);
-        printf("Latitude: %f\n", fleet[i].latitude);
-        printf("Longitude: %f\n", fleet[i].longitude);
-        printf("Geo Altitude: %f\n", fleet[i].geo_altitude);
-        printf("Velocity: %f\n", fleet[i].velocity);
-        printf("Last Contact: %d\n", fleet[i].last_contact);
-        printf("\n");
-    }
-
-    printf("Number of flights: %d\n", num_flights);
 
 
     free(seattle_data);
     free(fleet);
     cJSON_Delete(root);
+    
+    close_database(db);
     return 0;
 }
