@@ -4,17 +4,25 @@
 #include <curl/curl.h>
 #include "flight.h"
 #include "database.h"
-
-
-
 #include "../lib/cJSON.h"
+#include <unistd.h>
+
+
+
 
 typedef struct {
     char *data;
     size_t size;
 } ResponseBuffer;
 
-
+void save_response_to_file(const char *data, const char *filename) {
+    FILE *f = fopen(filename, "w");
+    if (f) {
+        fputs(data, f);
+        fclose(f);
+        printf("Saved API response to %s\n", filename);
+    }
+}
 
 // Callback function - libcurl calls this when data arrives
 size_t write_callback(void *contents, size_t size, size_t nmemb, void *userp) {
@@ -51,7 +59,27 @@ size_t write_callback(void *contents, size_t size, size_t nmemb, void *userp) {
 }
 
 
+char* load_from_file(const char *filename) {
+    FILE *f = fopen(filename, "r");
+    if (!f) {
+        fprintf(stderr, "Could not open file: %s\n", filename);
+        return NULL;
+    }
+    
+    fseek(f, 0, SEEK_END);
+    long fsize = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    
+    char *data = malloc(fsize + 1);
+    fread(data, 1, fsize, f);
+    data[fsize] = '\0';
+    
+    fclose(f);
+    return data;
+}
 
+
+// This function will make an http request to open sky and return a json string
 char* fetch_opensky() {
     CURL *curl;
     CURLcode res;
@@ -179,37 +207,82 @@ int main() {
     sqlite3 *db;
     init_database(&db);
     
-    char *seattle_data = fetch_opensky();
+    while (1) {
 
-    // This gets JSON root
-    cJSON *root = cJSON_Parse(seattle_data);
-
-    // This will get us the time
-    cJSON *time = cJSON_GetObjectItem(root, "time");
-
-    // This gets us the states array, which holds all flight data
-    cJSON *states = cJSON_GetObjectItem(root, "states");
-
-    // Get number of flights in the Seattle area
-    int num_flights = cJSON_GetArraySize(states);
-    printf("Number of flights in Seattle area: %d\n", num_flights);
+        //char *world_flight_data = fetch_opensky();
+        //save_response_to_file(world_flight_data, "test_data.json");
 
 
-    Flight *fleet = malloc(num_flights * sizeof(Flight));
+        char *world_flight_data = load_from_file("test_data.json");
 
-    // We pass in the flight to process, We pass in the allocated memory
 
-    for (int i = 0; i < num_flights; i++) {
-        parser_helper(cJSON_GetArrayItem(states, i), &fleet[i], time->valueint);
-        insert_flight(db, &fleet[i]);
+        // This gets the cJSON root
+        cJSON *root = cJSON_Parse(world_flight_data);
+
+        // This will get us the time
+        cJSON *flight_time = cJSON_GetObjectItem(root, "time");
+
+        // This gets us the states array, which holds all flight data
+        cJSON *states = cJSON_GetObjectItem(root, "states");
+
+        // Get number of flights in the Seattle area
+        int num_flights = cJSON_GetArraySize(states);
+        printf("Number of flights in the world currently: %d\n", num_flights);
+
+
+        Flight *fleet = malloc(num_flights * sizeof(Flight));
+
+        // We pass in the flight to process, We pass in the allocated memory
+        
+
+
+        time_t start = time(NULL);
+        begin_transaction(db);
+
+        int success = 1;
+        for (int i = 0; i < num_flights; i++) {
+            parser_helper(cJSON_GetArrayItem(states, i), &fleet[i], flight_time->valueint);
+
+            // If the flight does not return the code expected, then one flight was not processed correctly
+            if(insert_flight(db, &fleet[i]) != SQLITE_DONE) {
+                fprintf(stderr, "Insert failed for flight %d\n", i);
+                success = 0;
+                break;
+            }
+        }
+
+
+
+         // if success remains 1, then we succesfully inserted all flights, so we commit them all to disk at once
+         if (success) {
+           commit_transaction(db);
+            time_t end = time(NULL);
+
+
+            double time_spent = difftime(end, start);
+             printf("Inserted %d flights in %.0f seconds\n", num_flights, time_spent);
+         }   
+
+
+
+        // We rollback our inserts. If one insert fail then all inserts fail.
+         else {
+             rollback_transaction(db);
+
+         }
+        
+
+
+
+        free(world_flight_data);
+        free(fleet);
+        cJSON_Delete(root);
+
+        printf("Batch complete. Sleeping for 60 seconds ...\n");
+        sleep(60);
+
     }
     
-
-
-
-    free(seattle_data);
-    free(fleet);
-    cJSON_Delete(root);
     
     close_database(db);
     return 0;
