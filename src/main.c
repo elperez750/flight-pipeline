@@ -6,7 +6,7 @@
 #include "database.h"
 #include "../lib/cJSON.h"
 #include <unistd.h>
-
+#include <metrics.h>
 
 
 
@@ -207,13 +207,32 @@ int main() {
     sqlite3 *db;
     init_database(&db);
     
-    while (1) {
 
-        //char *world_flight_data = fetch_opensky();
+    int batch_number = 0;
+    while (1) {
+        batch_number++;
+
+        // Creating batch metrics struct
+        BatchMetrics metrics;
+        init_metrics(&metrics, batch_number);
+
+
+        // Starts timer for the api call
+
+
+        struct timespec api_start, api_end;
+        clock_gettime(CLOCK_MONOTONIC, &api_start);
+
+        char *world_flight_data = fetch_opensky();
         //save_response_to_file(world_flight_data, "test_data.json");
 
 
-        char *world_flight_data = load_from_file("test_data.json");
+
+        // Ends the timer for the api call
+        clock_gettime(CLOCK_MONOTONIC, &api_end);
+
+        // Enters total api time into our metrics struct
+        metrics.api_latency_ms = (api_end.tv_sec - api_start.tv_sec) * 1000.0 + (api_end.tv_nsec - api_start.tv_nsec) / 1000000.0;
 
 
         // This gets the cJSON root
@@ -225,8 +244,14 @@ int main() {
         // This gets us the states array, which holds all flight data
         cJSON *states = cJSON_GetObjectItem(root, "states");
 
+
         // Get number of flights in the Seattle area
         int num_flights = cJSON_GetArraySize(states);
+        
+
+        // Updates the number of flights in our metrics struct.
+        metrics.total_fetched = num_flights;
+
         printf("Number of flights in the world currently: %d\n", num_flights);
 
 
@@ -236,7 +261,8 @@ int main() {
         
 
 
-        time_t start = time(NULL);
+        struct timespec db_start, db_end;
+        clock_gettime(CLOCK_MONOTONIC, &db_start);
         begin_transaction(db);
 
         int success = 1;
@@ -244,11 +270,20 @@ int main() {
             parser_helper(cJSON_GetArrayItem(states, i), &fleet[i], flight_time->valueint);
 
             // If the flight does not return the code expected, then one flight was not processed correctly
-            if(insert_flight(db, &fleet[i]) != SQLITE_DONE) {
+
+            int result = insert_flight(db, &fleet[i]);
+            if (result == -1) {
                 fprintf(stderr, "Insert failed for flight %d\n", i);
                 success = 0;
                 break;
             }
+            else if (result == 1) {
+                metrics.new_records++;
+            }
+            else if(result == 0) {
+                metrics.duplicates++;
+            }
+
         }
 
 
@@ -256,23 +291,28 @@ int main() {
          // if success remains 1, then we succesfully inserted all flights, so we commit them all to disk at once
          if (success) {
            commit_transaction(db);
-            time_t end = time(NULL);
+            clock_gettime(CLOCK_MONOTONIC, &db_end);
 
 
-            double time_spent = difftime(end, start);
-             printf("Inserted %d flights in %.0f seconds\n", num_flights, time_spent);
+
+            
+        
+            metrics.write_latency_ms = (db_end.tv_sec - db_start.tv_sec) * 1000.0 + (db_end.tv_nsec - db_start.tv_nsec) / 1000000.0;
+            print_batch_metrics(&metrics);
+
          }   
-
-
 
         // We rollback our inserts. If one insert fail then all inserts fail.
          else {
              rollback_transaction(db);
+             fprintf(stderr, "Batch failed, rolled back transaction\n");
 
          }
         
 
-
+         if (batch_number % 1440 == 0) {
+            cleanup_old_data(db, 7);
+         }
 
         free(world_flight_data);
         free(fleet);

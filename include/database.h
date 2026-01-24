@@ -10,6 +10,7 @@ void close_database(sqlite3 *db);
 int begin_transaction(sqlite3 *db);
 int commit_transaction(sqlite3 *db);
 int rollback_transaction(sqlite3 *db);
+void cleanup_old_data(sqlite3 *db, int days_to_keep);
 
 
 #endif

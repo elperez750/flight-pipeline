@@ -30,12 +30,5 @@ typedef struct {
 
 
 
-typedef struct {
-    Flight *flights;
-    size_t flight_count;
-
-} FlightData;
-
-
 
 #endif

@@ -122,10 +122,16 @@ int insert_flight(sqlite3 *db, Flight *flight) {
     int rc = sqlite3_step(stmt);
     if(rc != SQLITE_DONE) {
         fprintf(stderr, "Values not properly inserted into database: %s\n", sqlite3_errmsg(db));
+        sqlite3_finalize(stmt);
+        return -1;
+
     }
 
+
+
+    int changes = sqlite3_changes(db);
     sqlite3_finalize(stmt);
-    return rc;
+    return changes;
 }
 
 
@@ -133,4 +139,25 @@ int insert_flight(sqlite3 *db, Flight *flight) {
 // Simply closes the database after using.
 void close_database(sqlite3 *db) {
     sqlite3_close(db);
+}
+
+
+
+void cleanup_old_data(sqlite3 *db, int days_to_keep) {
+    int cutoff_time = time(NULL) - (days_to_keep * 24 * 60 * 60);
+
+    char *sql = "DELETE FROM FLIGHTS WHERE TIME < ?";
+    sqlite3_stmt *stmt;
+    sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+    sqlite3_bind_int(stmt, 1, cutoff_time);
+    sqlite3_step(stmt);
+
+    int deleted = sqlite3_changes(db);
+
+    sqlite3_finalize(stmt);
+
+    if (deleted > 0) {
+        printf("Cleaned up %d records older than %d days\n", deleted, days_to_keep);
+
+    }
 }
